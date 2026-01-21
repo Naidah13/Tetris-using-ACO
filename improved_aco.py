@@ -346,7 +346,7 @@ class ThieryScherrerACO:
 class ACOWrapper:
     """Wrapper class for compatibility with main game loop."""
     
-    def __init__(self, n_ants=25):
+    def __init__(self, n_ants=40):
         self.aco = ThieryScherrerACO(n_ants=n_ants, lookahead=1)
         self.pheromones = {}  # For UI display
         self.avg_pheromone_level = 0.0  # Average pheromone across all trails

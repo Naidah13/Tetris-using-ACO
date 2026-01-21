@@ -15,13 +15,14 @@ from improved_aco import ACOWrapper
 # AUTOMATIC TESTING FUNCTION
 # ============================================================================
 
-def run_auto_test(n_games=50, max_moves=2000, save_results=True):
+def run_auto_test(n_games=50, n_ants=40, max_pieces=500, save_results=True):
     """
     Run N games automatically and track ACO learning progress.
     
     Args:
         n_games: Number of games to run
-        max_moves: Maximum moves per game (prevents infinite games)
+        n_ants: Number of ants in ACO colony
+        max_pieces: Maximum pieces per game (prevents infinite games)
         save_results: Whether to save results to JSON file
         
     Returns:
@@ -30,54 +31,65 @@ def run_auto_test(n_games=50, max_moves=2000, save_results=True):
     print("="*70)
     print(f"STARTING AUTOMATIC ACO TESTING - {n_games} GAMES")
     print("="*70)
-    print(f"Configuration: {n_games} games, max {max_moves} moves per game")
-    print(f"Expected runtime: ~{n_games * 2}min (approx 2min per game)")
+    print(f"Configuration: {n_games} games, {n_ants} ants, max {max_pieces} pieces per game")
+    print(f"Note: Using INSTANT DROP (like visual ACO mode) for accurate testing")
     print("="*70 + "\n")
     
-    aco = ACOWrapper(n_ants=25)
+    # IMPORTANT: Create ACO once and reuse across all games so learning persists!
+    aco = ACOWrapper(n_ants=n_ants)
     results = []
+    
+    print(f"ACO created with ID: {id(aco)}")
+    print(f"Initial pheromone levels: {aco.aco.pheromone_trails['holes'][:3]}\n")
     
     for game_num in range(n_games):
         game_start = datetime.now()
         game_state = GameState()
-        game_state.spawn_next(1, aco)  # mode=1 for ACO
         
-        moves = 0
         max_height_reached = 0
         pieces_placed = 0
         
-        # Run game until game over or max moves
-        while not game_state.game_over and moves < max_moves:
-            # Simulate piece falling
-            if valid_position(game_state.board, game_state.shape, game_state.x, game_state.y + 1):
+        # Spawn first piece (ACO chooses position here)
+        game_state.spawn_next(1, aco)  # mode=1 for ACO
+        
+        # Run game until game over or max pieces
+        while not game_state.game_over and pieces_placed < max_pieces:
+            # ACO already positioned piece in spawn_next()
+            # Now do INSTANT DROP to match visual game behavior
+            while valid_position(game_state.board, game_state.shape, game_state.x, game_state.y + 1):
                 game_state.y += 1
-            else:
-                # Lock piece in place
-                for i, row in enumerate(game_state.shape):
-                    for j, cell in enumerate(row):
-                        if cell and game_state.y + i >= 0:
-                            game_state.board[game_state.y + i][game_state.x + j] = 1
-                
-                pieces_placed += 1
-                
-                # Check game over
-                if any(game_state.board[0]):
-                    game_state.game_over = True
-                else:
-                    # Clear lines and spawn next piece
-                    game_state.board, cleared = clear_lines(game_state.board)
-                    if cleared > 0:
-                        game_state.lines_total += cleared
-                    
-                    # Track max height
-                    heights = column_heights(game_state.board)
-                    max_height_reached = max(max_height_reached, max(heights) if heights else 0)
-                    
-                    game_state.spawn_next(1, aco)
             
-            moves += 1
+            # Lock piece in place
+            for i, row in enumerate(game_state.shape):
+                for j, cell in enumerate(row):
+                    if cell and game_state.y + i >= 0:
+                        game_state.board[game_state.y + i][game_state.x + j] = 1
+            
+            pieces_placed += 1
+            
+            # Check game over (top row filled)
+            if any(game_state.board[0]):
+                game_state.game_over = True
+            else:
+                # Clear lines
+                game_state.board, cleared = clear_lines(game_state.board)
+                if cleared > 0:
+                    game_state.lines_total += cleared
+                
+                # Track max height
+                heights = column_heights(game_state.board)
+                max_height_reached = max(max_height_reached, max(heights) if heights else 0)
+                
+                # Spawn next piece (ACO chooses position here)
+                game_state.spawn_next(1, aco)
         
         game_duration = (datetime.now() - game_start).total_seconds()
+        
+        # DEBUG: Check if ACO is learning (first 3 games only)
+        if game_num < 3:
+            print(f"  [DEBUG] ACO ID after game {game_num+1}: {id(aco)}")
+            print(f"  [DEBUG] Best score tracked: {aco.aco.best_score:.1f}")
+            print(f"  [DEBUG] Iterations: {aco.aco.iterations}")
         
         # Store results
         game_result = {
@@ -85,7 +97,6 @@ def run_auto_test(n_games=50, max_moves=2000, save_results=True):
             'lines_cleared': game_state.lines_total,
             'pieces_placed': pieces_placed,
             'max_height': max_height_reached,
-            'moves': moves,
             'duration_seconds': round(game_duration, 2),
             'aco_iterations': aco.aco.iterations
         }
@@ -143,7 +154,7 @@ def run_auto_test(n_games=50, max_moves=2000, save_results=True):
     
     print("="*70)
     
-    # Save results to file
+    # Save results to JSON file
     if save_results:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"aco_test_results_{timestamp}.json"
@@ -152,8 +163,8 @@ def run_auto_test(n_games=50, max_moves=2000, save_results=True):
             'timestamp': timestamp,
             'configuration': {
                 'n_games': n_games,
-                'n_ants': 25,
-                'max_moves': max_moves
+                'n_ants': n_ants,
+                'max_pieces': max_pieces
             },
             'summary_statistics': {
                 'average_lines': sum(lines_list) / len(lines_list),
@@ -161,7 +172,8 @@ def run_auto_test(n_games=50, max_moves=2000, save_results=True):
                 'worst_lines': min(lines_list),
                 'std_dev': (sum((x - sum(lines_list)/len(lines_list))**2 for x in lines_list) / len(lines_list))**0.5,
                 'early_avg': sum(lines_list[:quarter]) / quarter if quarter > 0 else 0,
-                'late_avg': sum(lines_list[-quarter:]) / quarter if quarter > 0 else 0
+                'late_avg': sum(lines_list[-quarter:]) / quarter if quarter > 0 else 0,
+                'improvement_percent': improvement if quarter > 0 else 0
             },
             'games': results
         }
@@ -169,10 +181,9 @@ def run_auto_test(n_games=50, max_moves=2000, save_results=True):
         with open(filename, 'w') as f:
             json.dump(summary, f, indent=2)
         
-        print(f"\nResults saved to: {filename}")
+        print(f"\n✓ Results saved to: {filename}")
     
     return results
-
 
 # ============================================================================
 # TETRIS GAME LOGIC
@@ -357,7 +368,7 @@ class GameState:
         self.score = 0
         self.level = 1
         self.game_over = False
-        self.winner = False  # Currently unused (for future features)
+        self.winner = False
         self.shape_queue = [get_new_piece() for _ in range(3)]
         self.shape_name, self.shape, self.x, self.y = None, None, None, None
         self.fall_counter = 0
@@ -406,11 +417,20 @@ def get_new_piece():
 # MAIN GAME - UNCOMMENT TO RUN AUTO-TEST
 # ============================================================================
 
-# Uncomment the following lines to run automatic testing:
-# if __name__ == "__main__":
-#     run_auto_test(n_games=50, max_moves=2000, save_results=True)
-#     sys.exit()
-
+# Uncomment the following block to run automatic testing:
+if __name__ == "__main__":
+    # Optimal configuration based on testing:
+    # - 40-50 ants: Good balance between exploration and speed
+    # - 10000-12000 max_moves: Allows longer games but prevents infinite loops
+    # - 50 games: Enough to see learning convergence
+    
+    run_auto_test(
+        n_games=50,        # Number of games to test
+        n_ants=40,         # ACO colony size (40-50 recommended)
+        max_pieces=10000,   # Max moves per game (10k-12k recommended)
+        save_results=True  # Save results to JSON file
+    )
+    sys.exit()
 
 # ============================================================================
 # PYGAME INITIALIZATION AND MAIN LOOP
@@ -423,7 +443,7 @@ clock = pygame.time.Clock()
 font = pygame.font.SysFont("Arial", 18, bold=True)
 
 # Initialize ACO (persists across games to retain learning)
-aco = ACOWrapper(n_ants=25)
+aco = ACOWrapper(n_ants=40)
 game_state = GameState()
 mode = None
 show_menu = True
@@ -543,12 +563,6 @@ while True:
                         game_state.score += {1: 100, 2: 300, 3: 500, 4: 800}.get(cleared, 0) * game_state.level
                         game_state.lines_total += cleared
                         game_state.level = game_state.lines_total // 10 + 1
-                        
-                        # Level 15 win condition (currently disabled for testing)
-                        # Uncomment if you want to enable winner state:
-                        # if game_state.level >= 15:
-                        #     game_state.game_over = True
-                        #     game_state.winner = True
 
                     # Spawn next piece
                     game_state.spawn_next(mode, aco)
