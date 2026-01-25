@@ -4,43 +4,25 @@ import copy
 import sys
 import json
 from datetime import datetime
-
 from settings import *
 from renderer import draw_board, draw_piece
 from ui import draw_panel, draw_button, draw_menu, draw_game_over, draw_winner
 from effects import draw_ghost_piece
 from improved_aco import ACOWrapper
 
-# ============================================================================
-# AUTOMATIC TESTING FUNCTION
-# ============================================================================
-
+# Automatic testing function
 def run_auto_test(n_games=50, n_ants=40, max_pieces=500, save_results=True):
     """
-    Run N games automatically and track ACO learning progress.
-    
-    Args:
-        n_games: Number of games to run
-        n_ants: Number of ants in ACO colony
-        max_pieces: Maximum pieces per game (prevents infinite games)
-        save_results: Whether to save results to JSON file
-        
-    Returns:
-        List of results with detailed statistics
+    Executes a series of automated games to evaluate and track the ACO 
+    algorithm's learning progress without visual rendering.
     """
-    print("="*70)
     print(f"STARTING AUTOMATIC ACO TESTING - {n_games} GAMES")
-    print("="*70)
-    print(f"Configuration: {n_games} games, {n_ants} ants, max {max_pieces} pieces per game")
-    print(f"Note: Using INSTANT DROP (like visual ACO mode) for accurate testing")
-    print("="*70 + "\n")
+    print(f"\nConfiguration: {n_games} games, {n_ants} ants, max {max_pieces} pieces per game")
+    print("\n")
     
-    # IMPORTANT: Create ACO once and reuse across all games so learning persists!
+    # Persistent ACO instance allows learning to accumulate across games
     aco = ACOWrapper(n_ants=n_ants)
     results = []
-    
-    print(f"ACO created with ID: {id(aco)}")
-    print(f"Initial pheromone levels: {aco.aco.pheromone_trails['holes'][:3]}\n")
     
     for game_num in range(n_games):
         game_start = datetime.now()
@@ -49,17 +31,15 @@ def run_auto_test(n_games=50, n_ants=40, max_pieces=500, save_results=True):
         max_height_reached = 0
         pieces_placed = 0
         
-        # Spawn first piece (ACO chooses position here)
-        game_state.spawn_next(1, aco)  # mode=1 for ACO
-        
-        # Run game until game over or max pieces
+        # Initial piece spawn with ACO positioning
+        game_state.spawn_next(1, aco)  
+
         while not game_state.game_over and pieces_placed < max_pieces:
-            # ACO already positioned piece in spawn_next()
-            # Now do INSTANT DROP to match visual game behavior
+            # Simulate instant drop for testing efficiency
             while valid_position(game_state.board, game_state.shape, game_state.x, game_state.y + 1):
                 game_state.y += 1
             
-            # Lock piece in place
+            # Lock piece into the board array
             for i, row in enumerate(game_state.shape):
                 for j, cell in enumerate(row):
                     if cell and game_state.y + i >= 0:
@@ -67,31 +47,20 @@ def run_auto_test(n_games=50, n_ants=40, max_pieces=500, save_results=True):
             
             pieces_placed += 1
             
-            # Check game over (top row filled)
             if any(game_state.board[0]):
                 game_state.game_over = True
             else:
-                # Clear lines
                 game_state.board, cleared = clear_lines(game_state.board)
                 if cleared > 0:
                     game_state.lines_total += cleared
                 
-                # Track max height
                 heights = column_heights(game_state.board)
                 max_height_reached = max(max_height_reached, max(heights) if heights else 0)
-                
-                # Spawn next piece (ACO chooses position here)
                 game_state.spawn_next(1, aco)
         
         game_duration = (datetime.now() - game_start).total_seconds()
         
-        # DEBUG: Check if ACO is learning (first 3 games only)
-        if game_num < 3:
-            print(f"  [DEBUG] ACO ID after game {game_num+1}: {id(aco)}")
-            print(f"  [DEBUG] Best score tracked: {aco.aco.best_score:.1f}")
-            print(f"  [DEBUG] Iterations: {aco.aco.iterations}")
-        
-        # Store results
+        # Record game metrics for analysis
         game_result = {
             'game_number': game_num + 1,
             'lines_cleared': game_state.lines_total,
@@ -102,7 +71,6 @@ def run_auto_test(n_games=50, n_ants=40, max_pieces=500, save_results=True):
         }
         results.append(game_result)
         
-        # Calculate running statistics
         avg_lines = sum(r['lines_cleared'] for r in results) / len(results)
         best_game = max(results, key=lambda x: x['lines_cleared'])
         
@@ -120,9 +88,7 @@ def run_auto_test(n_games=50, n_ants=40, max_pieces=500, save_results=True):
             print(f"\n  === Last 10 games avg: {sum(recent_10)/10:.1f} lines ===\n")
     
     # Final statistics
-    print("\n" + "="*70)
     print("TESTING COMPLETE - FINAL RESULTS")
-    print("="*70)
     
     lines_list = [r['lines_cleared'] for r in results]
     print(f"Total games played: {n_games}")
@@ -151,10 +117,8 @@ def run_auto_test(n_games=50, n_ants=40, max_pieces=500, save_results=True):
             bar = "█" * (count * 50 // n_games)
             label = f"{low}-{high-1}" if high != float('inf') else f"{low}+"
             print(f"  {label:>8} lines: {bar} ({count})")
-    
-    print("="*70)
-    
-    # Save results to JSON file
+     
+    # Export results to JSON for external visualization/benchmarking
     if save_results:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"aco_test_results_{timestamp}.json"
@@ -181,14 +145,11 @@ def run_auto_test(n_games=50, n_ants=40, max_pieces=500, save_results=True):
         with open(filename, 'w') as f:
             json.dump(summary, f, indent=2)
         
-        print(f"\n✓ Results saved to: {filename}")
+        print(f"\nResults saved to: {filename}")
     
     return results
 
-# ============================================================================
-# TETRIS GAME LOGIC
-# ============================================================================
-
+# Standard Tetris piece definitions
 SHAPES = {
     "I": [[1, 1, 1, 1]],
     "O": [[1, 1],
@@ -207,18 +168,18 @@ SHAPES = {
           [1, 1]]
 }
 
-game_history = []  # Track scores across sessions
+game_history = [] 
 
 def rotate(shape):
-    """Rotate shape 90 degrees clockwise."""
+    """Rotate the piece matrix 90 degrees clockwise."""
     return [list(row) for row in zip(*shape[::-1])]
 
 def create_board():
-    """Create empty Tetris board."""
+    """Initialize an empty game board grid."""
     return [[0] * BOARD_WIDTH for _ in range(BOARD_HEIGHT)]
 
 def valid_position(board, shape, x, y):
-    """Check if piece position is valid."""
+    """Verify if the piece's current coordinates are within bounds and unoccupied."""
     for i, row in enumerate(shape):
         for j, cell in enumerate(row):
             if cell:
@@ -226,31 +187,35 @@ def valid_position(board, shape, x, y):
                     y + i >= BOARD_HEIGHT or 
                     (y + i >= 0 and board[y + i][x + j])):
                     return False
+                
     return True
 
 def drop_piece(board, shape, x):
-    """Simulate dropping piece to lowest valid position."""
+    """Simulate a hard drop on a temporary board to evaluate the outcome."""
     y = 0
     while valid_position(board, shape, x, y + 1):
         y += 1
+        
     new_board = copy.deepcopy(board)
     for i, row in enumerate(shape):
         for j, cell in enumerate(row):
             if cell:
                 if y + i >= 0:
                     new_board[y + i][x + j] = 1
+                    
     return new_board
 
 def clear_lines(board):
-    """Remove completed lines and return new board + count."""
+    """Identify, remove full rows, and shift remaining rows down."""
     new_board = [row for row in board if 0 in row]
     cleared = BOARD_HEIGHT - len(new_board)
     for _ in range(cleared):
         new_board.insert(0, [0] * BOARD_WIDTH)
+        
     return new_board, cleared
 
 def column_heights(board):
-    """Calculate height of each column."""
+    """Retrieve the height of each column for heuristic calculations."""
     heights = []
     for col in zip(*board):
         h = 0
@@ -259,10 +224,11 @@ def column_heights(board):
                 break
             h += 1
         heights.append(len(col) - h)
+        
     return heights
 
 def count_holes(board):
-    """Count holes - critical metric for board evaluation."""
+    """Count empty spaces that are trapped beneath locked blocks."""
     holes = 0
     for col in zip(*board):
         found = False
@@ -271,21 +237,23 @@ def count_holes(board):
                 found = True
             elif found:
                 holes += 1
+                
     return holes
 
 def calculate_bumpiness(board):
     """Calculate column height differences."""
     heights = column_heights(board)
+    
     return sum(abs(heights[i] - heights[i+1]) for i in range(len(heights)-1))
 
 def evaluate_board(board, lines_cleared):
     """
-    Improved board evaluation function.
-    Uses Pierre Dellacherie heuristics + additional penalties for height management.
+    Standard heuristic evaluation using a weighted combination of 
+    board features (Dellacherie-inspired).
     """
     heights = column_heights(board)
     
-    # Extract features
+    # Extract structural features
     landing_height = max(heights) if heights else 0
     eroded_cells = lines_cleared * 10
     
@@ -303,10 +271,10 @@ def evaluate_board(board, lines_cleared):
             if col[i] != col[i + 1]:
                 col_transitions += 1
     
-    # Holes (critical!)
+    # Holes 
     holes = count_holes(board)
     
-    # Wells (deep columns)
+    # Wells 
     wells = 0
     for i in range(len(heights)):
         left = heights[i-1] if i > 0 else 20
@@ -314,7 +282,7 @@ def evaluate_board(board, lines_cleared):
         if heights[i] < left and heights[i] < right:
             wells += (min(left, right) - heights[i])
     
-    # Height variance (penalize uneven board)
+    # Height variance 
     if heights:
         avg_height = sum(heights) / len(heights)
         height_variance = sum((h - avg_height) ** 2 for h in heights) / len(heights)
@@ -330,7 +298,7 @@ def evaluate_board(board, lines_cleared):
     # Dangerous tall columns
     dangerous_height = sum(1 for h in heights if h > 15)
     
-    # Pierre Dellacherie weights + additional penalties
+    # Pierre Dellacherie weights and additional penalties
     score = (
         -4.500158825082766 * landing_height +
         +3.4181268101392694 * eroded_cells +
@@ -356,12 +324,8 @@ def evaluate_board(board, lines_cleared):
     
     return score
 
-
-# ============================================================================
-# GAME STATE CLASS
-# ============================================================================
-
 class GameState:
+    """Manages the lifecycle, progression, and internal data of a Tetris session."""
     def __init__(self):
         self.board = create_board()
         self.lines_total = 0
@@ -374,11 +338,11 @@ class GameState:
         self.fall_counter = 0
         
     def spawn_next(self, mode, aco):
-        """Spawn next piece with appropriate positioning."""
+        """Prepares the next piece, using ACO logic if AI mode is active."""
         name, shp = self.shape_queue.pop(0)
         self.shape_queue.append(get_new_piece())
         
-        if mode == 1:  # ACO mode
+        if mode == 1:  # AI Mode: Consult ACO for optimal position
             move = aco.find_best_move(
                 self.board, 
                 name, 
@@ -394,7 +358,7 @@ class GameState:
             for _ in range(r):
                 shp = rotate(shp)
             self.shape_name, self.shape, self.x, self.y = name, shp, nx, 0
-        else:  # Manual mode
+        else:  # Manual Mode
             self.shape_name = name
             self.shape = shp
             self.x = BOARD_WIDTH // 2 - len(shp[0]) // 2
@@ -404,55 +368,43 @@ class GameState:
             self.game_over = True
             
     def reset(self):
-        """Reset game state."""
         self.__init__()
 
 def get_new_piece():
-    """Get random Tetris piece."""
+    """Pick a random tetromino shape from the library."""
     name = random.choice(list(SHAPES.keys()))
+    
     return name, SHAPES[name]
 
+# Uncomment the following block to run automatic testing
+# if __name__ == "__main__":
+#     run_auto_test(
+#         n_games=50,        
+#         n_ants=40,         
+#         max_pieces=10000,   
+#         save_results=True 
+#    )
+#    sys.exit()
 
-# ============================================================================
-# MAIN GAME - UNCOMMENT TO RUN AUTO-TEST
-# ============================================================================
-
-# Uncomment the following block to run automatic testing:
-if __name__ == "__main__":
-    # Optimal configuration based on testing:
-    # - 40-50 ants: Good balance between exploration and speed
-    # - 10000-12000 max_moves: Allows longer games but prevents infinite loops
-    # - 50 games: Enough to see learning convergence
-    
-    run_auto_test(
-        n_games=50,        # Number of games to test
-        n_ants=40,         # ACO colony size (40-50 recommended)
-        max_pieces=10000,   # Max moves per game (10k-12k recommended)
-        save_results=True  # Save results to JSON file
-    )
-    sys.exit()
-
-# ============================================================================
-# PYGAME INITIALIZATION AND MAIN LOOP
-# ============================================================================
-
+# System Initialization
 pygame.init()
 screen = pygame.display.set_mode((BOARD_WIDTH * CELL + SIDEBAR, BOARD_HEIGHT * CELL))
 pygame.display.set_caption("Tetris ACO")
 clock = pygame.time.Clock()
 font = pygame.font.SysFont("Arial", 18, bold=True)
+credit_font = pygame.font.SysFont("Arial", 14, italic=True)
 
-# Initialize ACO (persists across games to retain learning)
+# Application state
 aco = ACOWrapper(n_ants=40)
 game_state = GameState()
 mode = None
 show_menu = True
 
-# UI buttons
-mode_btn = pygame.Rect(BOARD_WIDTH * CELL + 30, 380, 130, 40)
+# UI layout definitions
+mode_btn = pygame.Rect(BOARD_WIDTH * CELL + 30, 370, 130, 40)
 restart_btn = pygame.Rect(BOARD_WIDTH * CELL // 2 - 65, BOARD_HEIGHT * CELL // 2 + 60, 130, 40)
 
-# Main loop
+# Primary Game Loop
 while True:
     screen.fill(BG_COLOR)
     
@@ -463,7 +415,7 @@ while True:
 
         if event.type == pygame.MOUSEBUTTONDOWN:
             if show_menu:
-                # Menu mode selection
+                # Calculate menu button collision bounds
                 full_width = BOARD_WIDTH * CELL + SIDEBAR
                 button_width = 180
                 button_height = 55
@@ -490,22 +442,21 @@ while True:
                     game_state.spawn_next(mode, aco)
             
             elif mode_btn.collidepoint(event.pos) and not game_state.game_over:
-                # Switch between manual and ACO mode
+                # Switch between Manual and ACO Mode
                 mode = 1 - mode
                 game_state.spawn_next(mode, aco)
             
             elif game_state.game_over and restart_btn.collidepoint(event.pos):
-                # Restart game (preserve ACO learning!)
+                # Restart game
                 game_history.append(game_state.lines_total)
                 print(f"Game {len(game_history)}: {game_state.lines_total} lines | "
                       f"Avg: {sum(game_history)/len(game_history):.1f} | "
                       f"Best: {max(game_history)}")
                 game_state.reset()
-                # Important: Do NOT reset ACO - it needs to retain learned weights
                 show_menu = True
                 mode = None
 
-        # Manual mode controls
+        # Input handling for manual gameplay
         if not game_state.game_over and mode == 0 and event.type == pygame.KEYDOWN:
             if event.key == pygame.K_LEFT and valid_position(game_state.board, game_state.shape, game_state.x - 1, game_state.y):
                 game_state.x -= 1
@@ -525,19 +476,29 @@ while True:
     # Show menu
     if show_menu:
         draw_menu(screen, font)
+   
+        credits_surface = credit_font.render("© 2026 Hasovic N. & Malinov L.", True, (180, 180, 190))
+        total_width = BOARD_WIDTH * CELL + SIDEBAR
+        total_height = BOARD_HEIGHT * CELL
+        credits_rect = credits_surface.get_rect(center=(total_width // 2, total_height - 20))
+        screen.blit(credits_surface, credits_rect)
+
         pygame.display.flip()
         clock.tick(60)
         continue
 
-    # Game logic
+    # Gravity and movement logic
     if not game_state.game_over:
         game_state.fall_counter += 1
         
         # Adjust fall speed based on mode
-        if mode == 1:  # ACO mode - fast
+        if mode == 1:  # Fast in Aco Mode
             fall_threshold = 3
-        else:  # Manual mode - progressive speed
-            fall_threshold = max(10, 40 - game_state.level * 2)
+        else:  # Constant in Manual Mode
+            fall_threshold = 30
+        
+        #else:  # Progressive speed in Manual Mode
+        #    fall_threshold = max(7, 40 - game_state.level * 1.5)
         
         if game_state.fall_counter >= fall_threshold:
             game_state.fall_counter = 0
@@ -545,36 +506,32 @@ while True:
             if valid_position(game_state.board, game_state.shape, game_state.x, game_state.y + 1):
                 game_state.y += 1
             else:
-                # Lock piece
                 for i, row in enumerate(game_state.shape):
                     for j, cell in enumerate(row):
                         if cell and game_state.y + i >= 0:
                             game_state.board[game_state.y + i][game_state.x + j] = 1
                 
-                # Check game over (top row filled)
                 if any(game_state.board[0]):
                     game_state.game_over = True
                 else:
-                    # Clear lines
                     game_state.board, cleared = clear_lines(game_state.board)
                     
                     if cleared > 0:
-                        # Score calculation
                         game_state.score += {1: 100, 2: 300, 3: 500, 4: 800}.get(cleared, 0) * game_state.level
                         game_state.lines_total += cleared
                         game_state.level = game_state.lines_total // 10 + 1
 
-                    # Spawn next piece
+                        if game_state.level >= 15:
+                            game_state.winner = True
+                            game_state.game_over = True
+                            
                     game_state.spawn_next(mode, aco)
 
-    # Rendering
+    # Rendering sequence
     draw_board(screen, game_state.board)
-    
     if not game_state.game_over:
-        # Draw ghost piece (shows where piece will land)
         draw_ghost_piece(screen, game_state.board, game_state.shape, game_state.x, 
                         SHAPE_COLORS[game_state.shape_name], valid_position)
-        # Draw active piece
         draw_piece(screen, game_state.shape, game_state.x, game_state.y, 
                   SHAPE_COLORS[game_state.shape_name])
 
