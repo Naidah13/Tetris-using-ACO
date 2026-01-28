@@ -497,7 +497,7 @@ while True:
         else:  # Constant in Manual Mode
             fall_threshold = 30
         
-        #else:  # Progressive speed in Manual Mode
+        #else:  # Progressive speed in Manual Mode depending on the level achieved
         #    fall_threshold = max(7, 40 - game_state.level * 1.5)
         
         if game_state.fall_counter >= fall_threshold:

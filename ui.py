@@ -20,7 +20,7 @@ def draw_panel(screen, font, mode, lines, score, level, aco_iterations, avg_pher
     # Decorative separator line
     pygame.draw.line(screen, GRID_COLOR, (panel.x + 20, 65), (panel.x + SIDEBAR - 20, 65), 2)
 
-    # Mode indicator (Manual vs AI)
+    # Mode indicator (Manual vs ACO)
     mode_txt = "MANUAL" if mode == 0 else "ACO ACTIVE"
     mode_color = (255, 200, 0) if mode == 0 else (0, 255, 150)
     screen.blit(font.render("MODE:", True, TEXT_COLOR), (panel.x + 20, 80))
@@ -62,21 +62,15 @@ def draw_panel(screen, font, mode, lines, score, level, aco_iterations, avg_pher
         screen.blit(controls_font.render("SPACE: Hard drop", True, TEXT_COLOR), (panel.x + 20, controls_y + 72))
 
 def draw_button(screen, rect, text, font, highlighted=False):
-    """
-    Renders a stylized interactive button with shadows and highlights.
-    """
     color = ACCENT if highlighted else (50, 50, 60)
     border_color = ACCENT if highlighted else (70, 70, 80)
     
-    # Render drop shadow
     shadow = pygame.Rect(rect.x + 2, rect.y + 2, rect.w, rect.h)
     pygame.draw.rect(screen, (10, 10, 15), shadow, border_radius=8)
     
-    # Render main button body and border
     pygame.draw.rect(screen, color, rect, border_radius=8)
     pygame.draw.rect(screen, border_color, rect, 2, border_radius=8)
     
-    # Center text inside the button
     text_surf = font.render(text, True, TEXT_COLOR)
     text_rect = text_surf.get_rect(center=rect.center)
     screen.blit(text_surf, text_rect)
@@ -91,19 +85,16 @@ def draw_menu(screen, font):
     overlay.fill((10, 10, 15))
     screen.blit(overlay, (0, 0))
     
-    # Title display
     title_font = pygame.font.SysFont("Arial", 48, bold=True)
     title = title_font.render("TETRIS ACO", True, ACCENT)
     title_rect = title.get_rect(center=(full_width // 2, BOARD_HEIGHT * CELL // 3))
     screen.blit(title, title_rect)
     
-    # Subtitle
     subtitle_font = pygame.font.SysFont("Arial", 18)
     subtitle = subtitle_font.render("Ant Colony Optimization", True, (150, 150, 160))
     subtitle_rect = subtitle.get_rect(center=(full_width // 2, BOARD_HEIGHT * CELL // 3 + 50))
     screen.blit(subtitle, subtitle_rect)
     
-    # Positioning for mode selection buttons
     button_width = 180
     button_height = 55
     manual_btn = pygame.Rect(

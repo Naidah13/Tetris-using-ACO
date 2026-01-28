@@ -6,8 +6,8 @@ class ThieryScherrerACO:
     Implementation of Ant Colony Optimization for Tetris based on:
     'Applying Ant Colony Optimization to Tetris' (Thiery & Scherrer, 2009).
     
-    The algorithm learns optimal weights for board features rather than 
-    direct positions. Each 'ant' samples a set of weights, and the best 
+    This algorithm learns optimal weights for board features rather than 
+    diirect positions. Each 'ant' samples a set of weights, and the best 
     performing ant reinforces its choices via pheromone updates.
     """
     def __init__(self, n_ants=40, lookahead=1):
@@ -34,7 +34,7 @@ class ThieryScherrerACO:
         for feature in self.features:
             self.pheromone_trails[feature] = self._init_weight_trail(feature)
         
-        # MAX-MIN Ant System (MMAS) constants to control exploration vs exploitation
+        # MAX-MIN Ant System constants to control exploration vs exploitation
         self.tau_min = 0.1      # Lower bound for pheromones
         self.tau_max = 4.0      # Upper bound for pheromones
         self.rho = 0.1          # Evaporation rate
@@ -48,13 +48,13 @@ class ThieryScherrerACO:
         
     def _init_weight_trail(self, feature):
         """
-        Initialize discrete weight values with a uniform pheromone level.
+        Initialize discrete weight values with an uniform pheromone level.
         """
         if feature == 'eroded_cells':
-            # Rewards (positive weights) for clearing lines
+            # Rewards for clearing lines
             weights = [i * 0.5 for i in range(0, 21)]  
         else:
-            # Penalties (negative weights) for undesirable board features
+            # Penalties for undesirable board features
             weights = [-i * 0.5 for i in range(0, 21)]  
         
         initial_pheromone = 2.0
@@ -73,7 +73,6 @@ class ThieryScherrerACO:
         # Eroded cells
         features['eroded_cells'] = lines_cleared * 10
         
-        # Calculate horizontal transitions between filled and empty cells
         row_trans = 0
         for row in board:
             for i in range(len(row) - 1):
@@ -81,7 +80,6 @@ class ThieryScherrerACO:
                     row_trans += 1
         features['row_transitions'] = row_trans
         
-        # Calculate vertical transitions between filled and empty cells
         col_trans = 0
         for col in zip(*board):
             for i in range(len(col) - 1):
@@ -89,10 +87,10 @@ class ThieryScherrerACO:
                     col_trans += 1
         features['col_transitions'] = col_trans
         
-        # Feature 5: Holes (critical metric - empty cells below filled cells)
+        # Holes
         features['holes'] = self._count_holes(board)
         
-        # Calculate vertical gaps (wells) between adjacent columns
+        # Calculate vertical gaps (wells) 
         wells = 0
         for i in range(len(heights)):
             left_height = heights[i-1] if i > 0 else 20
@@ -260,7 +258,7 @@ class ThieryScherrerACO:
         """
         Update pheromone trails using the MAX-MIN Ant System rules.
         """
-        # Decay existing pheromones (evaporation)
+        # Decay existing pheromones 
         for feature_name in self.features:
             trail = self.pheromone_trails[feature_name]
             for i in range(len(trail)):
